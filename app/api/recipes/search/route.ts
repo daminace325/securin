@@ -18,9 +18,12 @@ export async function GET(req: NextRequest) {
   try {
     const client = await clientPromise;
     const db = client.db('RecipeDB');
-    const collection = db.collection('recipe');
+    const collection = db.collection('recipe');    const { searchParams } = new URL(req.url);
 
-    const { searchParams } = new URL(req.url);
+    // Get pagination parameters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '15');
+    const skip = (page - 1) * limit;
 
     const query: any = {};
 
@@ -65,10 +68,16 @@ export async function GET(req: NextRequest) {
           }
         }; // This only works in aggregation pipeline, see note below
       }
-    }
+    }    // Because calories need parsing, use aggregation
+    const matchStage = {
+      ...query,
+      ...(calories && parseComparison(calories)
+        ? { numericCalories: parseComparison(calories) }
+        : {})
+    };
 
-    // Because calories need parsing, use aggregation
-    const pipeline: any[] = [
+    // Pipeline to get the total count
+    const countPipeline: any[] = [
       {
         $addFields: {
           numericCalories: {
@@ -77,12 +86,33 @@ export async function GET(req: NextRequest) {
         }
       },
       {
-        $match: {
-          ...query,
-          ...(calories && parseComparison(calories)
-            ? { numericCalories: parseComparison(calories) }
-            : {})
+        $match: matchStage
+      },
+      {
+        $count: "total"
+      }
+    ];
+
+    // Pipeline to get the paginated results
+    const dataPipeline: any[] = [
+      {
+        $addFields: {
+          numericCalories: {
+            $toInt: { $arrayElemAt: [ { $split: ['$nutrients.calories', ' '] }, 0 ] }
+          }
         }
+      },
+      {
+        $match: matchStage
+      },
+      {
+        $sort: { rating: -1 } // Sort by rating descending
+      },
+      {
+        $skip: skip
+      },
+      {
+        $limit: limit
       },
       {
         $project: {
@@ -99,9 +129,15 @@ export async function GET(req: NextRequest) {
       }
     ];
 
-    const results = await collection.aggregate(pipeline).toArray();
+    // Execute both pipelines
+    const [countResult, results] = await Promise.all([
+      collection.aggregate(countPipeline).toArray(),
+      collection.aggregate(dataPipeline).toArray()
+    ]);
 
-    return NextResponse.json({ data: results });
+    const total = countResult.length > 0 ? countResult[0].total : 0;
+
+    return NextResponse.json({ data: results, total });
   } catch (error) {
     console.error('Error searching recipes:', error);
     return NextResponse.json(

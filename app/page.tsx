@@ -173,21 +173,21 @@ export default function Page() {
           type="text"
           placeholder="Filter by Title (partial)"
           value={filters.title}
-          onChange={(e) => handleFilterChange("title", e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFilterChange("title", e.target.value)}
           className="px-3 py-2 border rounded w-64"
         />
         <input
           type="text"
           placeholder="Filter by Cuisine"
           value={filters.cuisine}
-          onChange={(e) => handleFilterChange("cuisine", e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFilterChange("cuisine", e.target.value)}
           className="px-3 py-2 border rounded w-64"
         />
         <input
           type="text"
           placeholder='Filter by Rating (e.g. ">=4.5")'
           value={filters.rating}
-          onChange={(e) => handleFilterChange("rating", e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFilterChange("rating", e.target.value)}
           className="px-3 py-2 border rounded w-64"
         />
       </div>
